@@ -91,6 +91,13 @@ def main():
             # Insert the target pose [0, 0, 0, 0, 0, 0] 
             pred_poses = np.insert(pred_poses, max_src_offset, np.zeros((1,6)), axis=0)
             curr_times = times[tgt_idx - max_src_offset:tgt_idx + max_src_offset + 1]
+            if tgt_idx % 100 == 0:
+                print("shape of image_seq: {}".format(image_seq.shape))
+                print("shape of pred['pose']: {}".format(pred['pose'].get_shape))
+                print("shape of pred_poses: {}".format(pred_poses.get_shape))
+                print("pred['pose']: {}".format(pred['pose']))
+                print("pred['pose'][0]: {}".format(pred['pose'][0]))
+                print("Length of curr_times: {}".format(len(curr_times)))
             out_file = FLAGS.output_dir + '%.6d.txt' % (tgt_idx - max_src_offset)
             dump_pose_seq_TUM(out_file, pred_poses, curr_times)
 
