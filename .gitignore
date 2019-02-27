@@ -1,0 +1,7 @@
+# Dataset
+kitti_eval/pose_data/*
+
+*.pyc
+
+# pretrained models
+models/model*
