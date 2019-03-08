@@ -5,3 +5,8 @@ kitti_eval/pose_data/*
 
 # pretrained models
 models/model*
+*.txt
+*.png
+*.jpg
+*.jpeg
+*.pyc
