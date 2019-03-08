@@ -17,6 +17,7 @@ flags.DEFINE_integer("test_seq", 9, "Sequence id to test")
 flags.DEFINE_string("dataset_dir", None, "Dataset directory")
 flags.DEFINE_string("output_dir", None, "Output directory")
 flags.DEFINE_string("ckpt_file", None, "checkpoint file")
+flags.DEFINE_boolean('plot', False, 'Set format of output file')
 FLAGS = flags.FLAGS
 
 def load_image_sequence(dataset_dir, 
@@ -72,6 +73,9 @@ def main():
         times = f.readlines()
     times = np.array([float(s[:-1]) for s in times])
     max_src_offset = (FLAGS.seq_length - 1)//2
+
+    fixed_origin = np.zeros((1,6))
+
     with tf.Session() as sess:
         saver.restore(sess, FLAGS.ckpt_file)
         for tgt_idx in range(N):
@@ -91,14 +95,27 @@ def main():
             # Insert the target pose [0, 0, 0, 0, 0, 0] 
             pred_poses = np.insert(pred_poses, max_src_offset, np.zeros((1,6)), axis=0)
             curr_times = times[tgt_idx - max_src_offset:tgt_idx + max_src_offset + 1]
-            if tgt_idx % 100 == 0:
-                print("shape of image_seq: {}".format(image_seq.shape))
-                print("shape of pred['pose']: {}".format(pred['pose'].get_shape))
-                print("shape of pred_poses: {}".format(pred_poses.get_shape))
-                print("pred['pose']: {}".format(pred['pose']))
-                print("pred['pose'][0]: {}".format(pred['pose'][0]))
-                print("Length of curr_times: {}".format(len(curr_times)))
-            out_file = FLAGS.output_dir + '%.6d.txt' % (tgt_idx - max_src_offset)
-            dump_pose_seq_TUM(out_file, pred_poses, curr_times)
+            if FLAGS.plot: 
+                if (tgt_idx - max_src_offset) == 0:
+                    fixed_origin = pred_poses[0]
+                out_file = FLAGS.output_dir + 'inference.txt' 
+                dump_pose_seq_TUM(out_file, pred_poses, curr_times, fixed_origin, tgt_idx, FLAGS.plot)
+            else:
+                out_file = FLAGS.output_dir + '%.6d.txt' % (tgt_idx - max_src_offset)
+                dump_pose_seq_TUM(out_file, pred_poses, curr_times, np.zeros((1,6)), tgt_idx)
+#            out_file = FLAGS.output_dir + '%.6d.txt' % (tgt_idx - max_src_offset)
+#            dump_pose_seq_TUM(out_file, pred_poses, curr_times)
+#            dump_pose_seq_TUM(out_file, pred_poses, curr_times, np.zeros((1,6)), tgt_idx)
+            #DEBUG
+#            if tgt_idx % 100 == 0:
+#                print("shape of image_seq: {}".format(image_seq.shape))
+#                print("shape of pred['pose']: {}".format(pred['pose'].shape))
+#                print("shape of pred_poses: {}".format(pred_poses.shape))
+#                print("pred['pose']: {}".format(pred['pose']))
+#                print("fixed_origin: {}".format(fixed_origin))
+#                print("pred['pose'][0]: {}".format(pred['pose'][0]))
+#                print("Length of curr_times: {}".format(len(curr_times)))
+#                print("shape of fixed_origin: {}".format(fixed_origin.shape))
+
 
 main()
