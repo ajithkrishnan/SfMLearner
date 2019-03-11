@@ -10,3 +10,6 @@ models/model*
 *.jpg
 *.jpeg
 *.pyc
+
+# misc
+*.swp
