@@ -2,10 +2,11 @@
 # https://vision.in.tum.de/data/datasets/rgbd-dataset/tools#absolute_trajectory_error_ate
 
 import math
-import os
 import numpy as np
+import os
+import csv
 
-def compute_ate(gtruth_file, pred_file, flag=False):
+def compute_ate(gtruth_file, pred_file):
     gtruth_list = read_file_list(gtruth_file)
     pred_list = read_file_list(pred_file)
     matches = associate(gtruth_list, pred_list, 0, 0.01)
@@ -42,7 +43,7 @@ def read_file_list(filename):
     dict -- dictionary of (stamp,data) tuples
     
     """
-    file = open(filename)
+    file = open(filename,'r')
     data = file.read()
     lines = data.replace(","," ").replace("\t"," ").split("\n") 
     list = [[v.strip() for v in line.split(" ") if v.strip()!=""] for line in lines if len(line)>0 and line[0]!="#"]
@@ -369,38 +370,70 @@ def pose_vec_to_mat(vec):
     Tmat = np.concatenate((Tmat, hfiller), axis=0)
     return Tmat
 
-def dump_pose_seq_TUM(out_file, poses, times, fixed_origin, tgt_idx, plot=False):
+def pose_vec_quat_to_mat(vec):
+    tx = vec[1]
+    ty = vec[2]
+    tz = vec[3]
+    trans = np.array([tx, ty, tz]).reshape((3,1))
+    quat =  [vec[7], vec[4], vec[5], vec[6]]
+    rot = quat2mat(quat)
+    Tmat = np.concatenate((rot, trans), axis=1)
+    hfiller = np.array([0, 0, 0, 1]).reshape((1,4))
+    Tmat = np.concatenate((Tmat, hfiller), axis=0)
+    return Tmat
+
+def dump_pose_seq_TUM(out_file, poses, times):
     # First frame as the origin
-    if plot:
-#        print("shape of fixed_origin: {}".format(fixed_origin.shape))
-        first_origin = pose_vec_to_mat(fixed_origin)
-        if tgt_idx-2 == 0 and os.path.exists(out_file):
-            os.remove(out_file)
-        with open(out_file, 'a') as f:
-            for p in range(len(times)):
-                if (tgt_idx-2) == 0 or p == 4:
-                    this_pose = pose_vec_to_mat(poses[p])
-                    # DEBUG: Dirty fix
-#                    if p == 2:
-#                        this_pose = np.linalg.inv(this_pose)
-#                    this_pose = np.dot(this_pose, np.linalg.inv(first_origin))
-                    this_pose = np.dot(first_origin, np.linalg.inv(this_pose))
-                    tx = this_pose[0, 3]
-                    ty = this_pose[1, 3]
-                    tz = this_pose[2, 3]
-                    rot = this_pose[:3, :3]
-                    qw, qx, qy, qz = rot2quat(rot)
-                    f.write('%f %f %f %f %f %f %f %f\n' % (times[p], tx, ty, tz, qx, qy, qz, qw))
+    first_pose = pose_vec_to_mat(poses[0])
+    with open(out_file, 'w') as f:
+        for p in range(len(times)):
+            this_pose = pose_vec_to_mat(poses[p])
+            this_pose = np.dot(first_pose, np.linalg.inv(this_pose))
+            tx = this_pose[0, 3]
+            ty = this_pose[1, 3]
+            tz = this_pose[2, 3]
+            rot = this_pose[:3, :3]
+            qw, qx, qy, qz = rot2quat(rot)
+            f.write('%f %f %f %f %f %f %f %f\n' % (times[p], tx, ty, tz, qx, qy, qz, qw))
+
+def dump_pose_file_TUM(out_file, poses, times, tgt_idx, seq_length):
+    max_src_offset = int((seq_length - 1)/2)
+    pose_array = np.zeros((1,8))
+
+    if (tgt_idx - max_src_offset) == 0 and os.path.exists(out_file):
+        os.remove(out_file)
+
+    if (tgt_idx - max_src_offset) != 0:
+        with open(out_file, 'r') as r:
+            pose_list = list(csv.reader(r, delimiter=' '))
+
+            for j, _ in enumerate(pose_list):
+                pose_list[j] = [float(i) for i in pose_list[j]]
+
+            pose_array = np.array(pose_list)
+
+        # First frame as the origin
+        first_pose = pose_vec_quat_to_mat(pose_array[0])
+        num_poses = pose_array.shape[0]
+        num_cols = pose_array.shape[1]
+        prev_ref = pose_array[num_poses - 2]
+        prev_origin = pose_vec_quat_to_mat(prev_ref)
     else:
-        first_origin = pose_vec_to_mat(poses[0])
-        with open(out_file, 'w') as f:
-            for p in range(len(times)):
+        first_pose = pose_vec_to_mat(poses[0])
+
+    with open(out_file, 'a') as f:
+
+        for p in range(len(times)):
+
+            if (tgt_idx - max_src_offset == 0) or p == (len(times)-1):
+
                 this_pose = pose_vec_to_mat(poses[p])
-                # DEBUG: Dirty fix
-#                if p == 2:
-#                    this_pose = np.linalg.inv(this_pose)
-#                this_pose = np.dot(this_pose, np.linalg.inv(first_origin))
-                this_pose = np.dot(first_origin, np.linalg.inv(this_pose))
+
+                if (tgt_idx - max_src_offset != 0):
+                    this_pose = np.dot(prev_origin, np.linalg.inv(this_pose))
+                else:
+                    this_pose = np.dot(first_pose, np.linalg.inv(this_pose))
+
                 tx = this_pose[0, 3]
                 ty = this_pose[1, 3]
                 tz = this_pose[2, 3]
